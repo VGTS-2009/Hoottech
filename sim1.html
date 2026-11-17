@@ -1,0 +1,2020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WT-BENCH-04 // 40-Strip Coupled BEMT &amp; OpenFOAM RANS Rotor Simulation</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-chassis: #e6e5df;
+      --bg-panel: #ffffff;
+      --bg-subpanel: #f3f2ee;
+      --ink-primary: #111111;
+      --ink-secondary: #333333;
+      --ink-muted: #555555;
+      --border-hard: #111111;
+      --border-grid: #b8b7b0;
+      --case-a: #d9480f;
+      --case-b: #087f5b;
+      --signal-cyan: #0077b6;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background-color: var(--bg-chassis);
+      color: var(--ink-primary);
+      overflow-x: hidden;
+      margin: 0;
+    }
+
+    .mono {
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .panel-frame {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-hard);
+    }
+
+    .panel-header {
+      background-color: var(--bg-subpanel);
+      border-bottom: 1px solid var(--border-hard);
+      padding: 8px 12px;
+    }
+
+    .mech-btn {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border: 1px solid var(--border-hard);
+      background-color: var(--bg-panel);
+      color: var(--ink-primary);
+      cursor: pointer;
+      border-radius: 0;
+    }
+
+    .mech-btn:hover {
+      background-color: #dcdbd4;
+    }
+
+    .mech-btn-active {
+      background-color: var(--ink-primary);
+      color: #ffffff;
+    }
+
+    .mech-btn-active:hover {
+      background-color: #222222;
+    }
+
+    .mech-btn-action {
+      background-color: #087f5b;
+      color: #ffffff;
+      border: 1px solid var(--border-hard);
+    }
+
+    .mech-btn-action:hover {
+      background-color: #066649;
+    }
+
+    .mech-select {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 8px;
+      border: 1px solid var(--border-hard);
+      background-color: var(--bg-panel);
+      color: var(--ink-primary);
+      border-radius: 0;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #c8c7c0;
+      height: 4px;
+      border: 1px solid #111111;
+      border-radius: 0;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 10px;
+      height: 18px;
+      border-radius: 0;
+      background: #111111;
+      cursor: pointer;
+      border: 1px solid #ffffff;
+    }
+
+    input[type="range"].case-a-slider::-webkit-slider-thumb {
+      background: #d9480f;
+    }
+
+    input[type="range"].case-b-slider::-webkit-slider-thumb {
+      background: #087f5b;
+    }
+
+    input[type="checkbox"] {
+      accent-color: #111111;
+      width: 14px;
+      height: 14px;
+      border-radius: 0;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Hardware Specification & Control Bar -->
+  <header class="border-b-2 border-[#111111] bg-[#ffffff] sticky top-0 z-30">
+    <div class="max-w-[1600px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div class="flex flex-wrap items-baseline gap-3">
+          <h1 class="text-sm sm:text-base font-bold uppercase tracking-tight text-[#111111] mono">
+            WT-BENCH-04 // 40-STRIP COUPLED BEMT + 3D RANS CALIBRATION SUITE
+          </h1>
+          <span class="text-xs mono text-[#333333] border-l border-[#111111] pl-3">
+            R = 150.0mm | r_hub = 30.0mm | A_p,0 = 2882.40mm² | 5400 RPM (BPF = 180Hz)
+          </span>
+        </div>
+        <p class="text-xs text-[#333333] mt-0.5 mono">
+          Ref: B00 OpenFOAM simpleFoam RANS (178,412 cells: T=6.8116N, P=86.2110W, FoM=0.49552) // C0001 BEMT (T0=6.8280N, P0=86.1700W, FoM0=0.49755)
+        </p>
+      </div>
+
+      <!-- Scenario Presets & Transport Controls -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <div class="flex flex-wrap items-center border border-[#111111] bg-[#f3f2ee] p-0.5 gap-0.5">
+          <button id="preset4msBtn" type="button" class="mech-btn mech-btn-active">
+            4 m/s Crosswind Benchmark
+          </button>
+          <button id="presetF1Btn" type="button" class="mech-btn">
+            Regime F-I (0.47 m/s)
+          </button>
+          <button id="presetETLBtn" type="button" class="mech-btn">
+            ETL Transition (6 m/s)
+          </button>
+          <button id="presetHighWindBtn" type="button" class="mech-btn">
+            High Gale (10 m/s Stall)
+          </button>
+          <button id="presetF3Btn" type="button" class="mech-btn">
+            Regime F-III (15.5 m/s)
+          </button>
+        </div>
+
+        <button id="autoTrimBtn" type="button" class="mech-btn mech-btn-action" title="Set calibrated manuscript disk tilt (alpha_d = 10 deg) and trim offset (-0.9846 deg)">
+          Auto-Trim Equilibrium
+        </button>
+
+        <button id="playPauseBtn" type="button" class="mech-btn flex items-center gap-2">
+          <span id="playPauseIcon" class="w-2.5 h-2.5 inline-block bg-[#087f5b] border border-[#111111]"></span>
+          <span id="playPauseText">Pause Flow</span>
+        </button>
+
+        <button id="resetSimBtn" type="button" class="mech-btn">
+          Reset
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Instrument Grid -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    <!-- Left Column: Parameter Faders & Blade Section Inspector (4 cols) -->
+    <aside class="lg:col-span-4 flex flex-col gap-4">
+
+      <!-- Module 01: Archived Blade Geometry & Wind Tunnel Parameters -->
+      <section class="panel-frame flex flex-col">
+        <div class="panel-header flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-[#111111] mono">
+            01 // BLADE GEOMETRY &amp; TUNNEL INPUTS
+          </h2>
+          <span id="ReynoldsBadge" class="text-xs mono font-semibold text-[#333333]">Re_0.75R = 1.10e5</span>
+        </div>
+
+        <div class="p-3.5 flex flex-col gap-3.5">
+          <!-- Archived Blade Geometry Selector (from 100-Blade RANS & 1,296 Dataset) -->
+          <div class="bg-[#f3f2ee] border border-[#111111] p-2.5">
+            <div class="flex justify-between items-center mb-1.5">
+              <label for="bladeDesignSelect" class="text-xs font-bold uppercase mono text-[#111111]">Archived Blade Specimen:</label>
+              <span id="bladeAreaBadge" class="text-[11px] mono font-bold text-[#087f5b]">A_p = 2882.4 mm² (0.00%)</span>
+            </div>
+            <select id="bladeDesignSelect" class="mech-select w-full">
+              <option value="C0001">C0001 / B00 // Smooth Scimitar Baseline (A=2882.4 mm², FoM=0.49755)</option>
+              <option value="U022">U022 // OpenFOAM RANS Champion (TE c=0.58, h=4.3mm, dFoM_RANS=+0.581%)</option>
+              <option value="U043">U043 // OpenFOAM RANS Top Thrust (TE c=0.45, h=3.8mm, dFoM_RANS=+0.518%)</option>
+              <option value="U081">U081 // OpenFOAM Cut-In Control (f_A=0, A=2568.2 mm², dFoM_RANS=-14.26%)</option>
+              <option value="C0073">C0073 // WaveRidges Efficiency Leader (dFoM_M3=+1.35%, dOASPL_H=-3.60 dB)</option>
+              <option value="C0109">C0109 // WaveRidges Acoustic Leader (dFoM_M3=+1.25%, dOASPL_H=-3.70 dB)</option>
+              <option value="C0217">C0217 // Pure TE Serration Tier-I (dFoM_M4=-0.29%±0.53%, dOASPL_H=-2.37 dB)</option>
+              <option value="C0289">C0289 // WR+TE Hybrid Podium (dFoM_M4=+0.92%±0.54%, dOASPL_H=-5.24 dB)</option>
+              <option value="C0295">C0295 // WR+FN+TE Triple Podium (dFoM_M4=+0.62%±0.54%, dOASPL_H=-5.96 dB)</option>
+              <option value="C0345">C0345 // WR+FN+FR+TE Quad Leader (dFoM_M4=-1.35%±0.54%, dOASPL_H=-6.39 dB)</option>
+              <option value="C1081">C1081 // Cut-In TE Serration (f_A=0, A=2693.4 mm², dFoM_M4=-5.96%±1.27%)</option>
+            </select>
+            <div id="bladeArchiveMeta" class="text-[11px] mono text-[#333333] mt-1.5 leading-snug">
+              RANS B00: T=6.8116N, P=86.2110W, FoM=0.49552 | BEMT C0001: T=6.8280N, P=86.1700W, FoM=0.49755
+            </div>
+          </div>
+
+          <!-- Freestream Wind Velocity (Case A) -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <label for="windSpeedSlider" class="font-semibold text-[#111111]">Case A Crosswind Speed (V_inf,A)</label>
+              <span id="windSpeedVal" class="mono font-bold text-[#0077b6]">4.00 m/s (J = 0.148)</span>
+            </div>
+            <input id="windSpeedSlider" type="range" min="0" max="16.2" step="0.01" value="4.00" class="w-full" />
+            <div class="flex justify-between text-[10px] text-[#555555] mt-1 mono">
+              <span>0.0 (Hover)</span>
+              <span>0.47 (F-I)</span>
+              <span>4.00 (Ref)</span>
+              <span>6.21 (F-II)</span>
+              <span>15.50 (F-III)</span>
+            </div>
+          </div>
+
+          <!-- Case A Disk Tilt (alpha_d,A) -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <label for="pitchASlider" class="font-semibold text-[#111111]">Case A Disk Tilt Angle (alpha_d,A)</label>
+              <span id="pitchAVal" class="mono font-bold text-[#d9480f]">0.0° (Edgewise Hover)</span>
+            </div>
+            <input id="pitchASlider" type="range" min="-10" max="20" step="0.5" value="0.0" class="w-full case-a-slider" />
+            <div class="flex justify-between text-[10px] text-[#555555] mt-1 mono">
+              <span>-10.0° AFT</span>
+              <span>0.0° EDGEWISE CROSSWIND</span>
+              <span>+20.0° FWD</span>
+            </div>
+          </div>
+
+          <!-- Case B Disk Tilt (alpha_d,B) -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <label for="pitchBSlider" class="font-semibold text-[#111111]">Case B Forward Disk Tilt (alpha_d,B)</label>
+              <span id="pitchBVal" class="mono font-bold text-[#087f5b]">10.0° (Tilted Forward)</span>
+            </div>
+            <input id="pitchBSlider" type="range" min="0" max="35" step="0.5" value="10.0" class="w-full case-b-slider" />
+            <div class="flex justify-between text-[10px] text-[#555555] mt-1 mono">
+              <span>0.0°</span>
+              <span>10.0° MANUSCRIPT REF (F-I..F-III)</span>
+              <span>35.0°</span>
+            </div>
+          </div>
+
+          <!-- Case B Additional Forward Speed (V_inf,B = V_inf,A + dV_B) -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <label for="forwardSpeedBSlider" class="font-semibold text-[#111111]">Case B Forward Airspeed (V_inf,B)</label>
+              <span id="forwardSpeedBVal" class="mono font-bold text-[#087f5b]">6.21 m/s (J = 0.230)</span>
+            </div>
+            <input id="forwardSpeedBSlider" type="range" min="0" max="12" step="0.01" value="2.21" class="w-full case-b-slider" />
+            <div class="flex justify-between text-[10px] text-[#555555] mt-1 mono">
+              <span>+0.00 m/s (Match V_inf,A)</span>
+              <span>+2.21 m/s (J=0.230 Cruise)</span>
+              <span>+12.0 m/s</span>
+            </div>
+          </div>
+
+          <!-- Rotor RPM & Collective Pitch Trim Offset -->
+          <div class="grid grid-cols-2 gap-3 pt-2.5 border-t border-[#b8b7b0]">
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <label for="rpmSlider" class="font-semibold text-[#111111]">Rotor RPM</label>
+                <span id="rpmVal" class="mono font-bold text-[#111111]">5400</span>
+              </div>
+              <input id="rpmSlider" type="range" min="3000" max="7500" step="50" value="5400" class="w-full" />
+              <div class="text-[10px] text-[#555555] mt-0.5 mono">Cal: 5400 RPM (565.5 rad/s)</div>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <label for="bladePitchSlider" class="font-semibold text-[#111111]">Pitch Trim dtheta</label>
+                <span id="bladePitchVal" class="mono font-bold text-[#111111]">-0.98°</span>
+              </div>
+              <input id="bladePitchSlider" type="range" min="-3.00" max="3.00" step="0.01" value="-0.98" class="w-full" />
+              <div class="text-[10px] text-[#555555] mt-0.5 mono">Cal: -0.9846° (k_ind=1.5271)</div>
+            </div>
+          </div>
+
+          <!-- Visualization Layer Toggles -->
+          <div class="pt-2.5 border-t border-[#b8b7b0]">
+            <span class="text-xs font-bold uppercase tracking-wider text-[#111111] mono block mb-1.5">OPTICAL OVERLAY CHANNELS</span>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <label class="flex items-center gap-2 bg-[#f3f2ee] border border-[#111111] px-2.5 py-1.5 cursor-pointer font-medium">
+                <input id="toggleStreamlines" type="checkbox" checked />
+                <span>Smoke Streamlines</span>
+              </label>
+              <label class="flex items-center gap-2 bg-[#f3f2ee] border border-[#111111] px-2.5 py-1.5 cursor-pointer font-medium">
+                <input id="toggleVortices" type="checkbox" checked />
+                <span>Tip Vortex Helices</span>
+              </label>
+              <label class="flex items-center gap-2 bg-[#f3f2ee] border border-[#111111] px-2.5 py-1.5 cursor-pointer font-medium">
+                <input id="togglePressure" type="checkbox" checked />
+                <span>Downwash Field</span>
+              </label>
+              <label class="flex items-center gap-2 bg-[#f3f2ee] border border-[#111111] px-2.5 py-1.5 cursor-pointer font-medium">
+                <input id="toggleVectors" type="checkbox" checked />
+                <span>Force Vectors</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Module 02: Blade Element Airfoil Cross-Section Inspector (r/R = 0.75, Strip k=28) -->
+      <section class="panel-frame flex flex-col">
+        <div class="panel-header flex items-center justify-between">
+          <div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-[#111111] mono">
+              02 // 0.75R STRIP INSPECTOR (r=112.5mm, c=25.25mm)
+            </h2>
+          </div>
+          <span id="azimuthBadge" class="px-2 py-0.5 bg-[#111111] text-[#ffffff] text-xs mono font-semibold">psi = 90° (Adv)</span>
+        </div>
+
+        <div class="p-3.5 flex flex-col gap-3">
+          <!-- Azimuth Angle Selector -->
+          <div>
+            <div class="flex justify-between items-center text-xs mb-1.5">
+              <label for="azimuthSlider" class="font-semibold text-[#111111]">Azimuth Sector (psi, N_psi=72)</label>
+              <div class="flex gap-1">
+                <button id="azAdvBtn" type="button" class="mech-btn">90° Advancing</button>
+                <button id="azRetBtn" type="button" class="mech-btn">270° Retreating</button>
+              </div>
+            </div>
+            <input id="azimuthSlider" type="range" min="0" max="355" step="5" value="90" class="w-full" />
+          </div>
+
+          <!-- Airfoil Velocity Triangle Canvas -->
+          <div class="relative w-full h-44 bg-[#080a0f] border border-[#111111] overflow-hidden">
+            <canvas id="airfoilCanvas" class="w-full h-full block"></canvas>
+          </div>
+
+          <!-- Blade Element Comparison Readout (Exact 40-Strip BEMT at r = 112.5 mm) -->
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="bg-[#f3f2ee] border border-[#111111] p-2.5">
+              <div class="text-[11px] font-bold uppercase text-[#d9480f] mono border-b border-[#b8b7b0] pb-1 mb-1.5">CASE A // 0.75R STRIP</div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Inflow phi_in:</span><span id="foilPhiA" class="mono font-semibold text-[#111111]">5.42°</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Eff. AoA alpha:</span><span id="foilAoAA" class="mono font-bold text-[#d9480f]">5.73°</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Rel. Speed W:</span><span id="foilUTA" class="mono font-semibold text-[#111111]">67.3 m/s</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Loading dT/dr:</span><span id="foilLiftA" class="mono font-bold text-[#d9480f]">96.4 N/m</span></div>
+            </div>
+            <div class="bg-[#f3f2ee] border border-[#111111] p-2.5">
+              <div class="text-[11px] font-bold uppercase text-[#087f5b] mono border-b border-[#b8b7b0] pb-1 mb-1.5">CASE B // 0.75R STRIP</div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Inflow phi_in:</span><span id="foilPhiB" class="mono font-semibold text-[#111111]">6.18°</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Eff. AoA alpha:</span><span id="foilAoAB" class="mono font-bold text-[#087f5b]">4.97°</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Rel. Speed W:</span><span id="foilUTB" class="mono font-semibold text-[#111111]">69.5 m/s</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-[#333333]">Loading dT/dr:</span><span id="foilLiftB" class="mono font-bold text-[#087f5b]">95.8 N/m</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Right Column: Dual Wind Tunnel Optical Chamber + Telemetry & BEMT Regimes (8 cols) -->
+    <section class="lg:col-span-8 flex flex-col gap-4">
+
+      <!-- Module 03: Optical Test Chamber -->
+      <div class="panel-frame flex flex-col">
+        <div class="panel-header flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold text-[#111111] uppercase tracking-wider mono">03 // OPTICAL TEST SECTION:</span>
+            <div class="inline-flex border border-[#111111] bg-[#f3f2ee] p-0.5 gap-0.5">
+              <button id="viewModeSplitBtn" type="button" class="mech-btn mech-btn-active">
+                Dual Side-by-Side CFD
+              </button>
+              <button id="viewModeDiskBtn" type="button" class="mech-btn">
+                Rotor Disk Polar Lift Map (Top-Down)
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4 text-xs mono">
+            <span class="flex items-center gap-1.5 text-[#111111]">
+              <span class="w-3 h-3 bg-[#00b4d8] border border-[#111111] inline-block"></span> V_inf Flow
+            </span>
+            <span class="flex items-center gap-1.5 text-[#111111]">
+              <span class="w-3 h-3 bg-[#ff5500] border border-[#111111] inline-block"></span> Skewed Tip Vortex
+            </span>
+            <span class="flex items-center gap-1.5 text-[#111111]">
+              <span class="w-3 h-3 bg-[#00e676] border border-[#111111] inline-block"></span> Thrust T
+            </span>
+          </div>
+        </div>
+
+        <!-- Main Interactive Wind Tunnel Canvas Container -->
+        <div class="p-3 bg-[#ffffff]">
+          <div class="relative w-full h-[460px] sm:h-[500px] bg-[#080a0f] overflow-hidden border border-[#111111]">
+            <canvas id="windTunnelCanvas" class="w-full h-full block"></canvas>
+
+            <!-- Hard-edged Technical Readout Overlays -->
+            <div id="hudOverlayA" class="absolute top-3 left-3 pointer-events-none bg-[#111111] border border-[#ff5500] px-3 py-2 max-w-[290px]">
+              <div class="flex items-center justify-between gap-3 border-b border-[#333333] pb-1">
+                <span class="text-xs font-bold text-[#ff7b00] uppercase mono">CHAMBER A: HOVER vs CROSSWIND</span>
+                <span id="hudStatusA" class="text-[10px] mono px-1.5 py-0.5 bg-[#ff5500] text-[#ffffff] font-bold">EDGEWISE</span>
+              </div>
+              <p class="text-[11px] text-[#e5e5e0] mt-1.5 leading-snug mono">
+                V_x = <span id="hudEdgeA" class="text-[#ff9e00] font-bold">4.00 m/s</span> | Skew chi = <span id="hudSkewA" class="text-[#ff9e00] font-bold">23.4°</span>. Pitt-Peters k_x longitudinal wake gradient &amp; advancing/retreating asymmetry.
+              </p>
+            </div>
+
+            <div id="hudOverlayB" class="absolute bottom-3 left-3 sm:top-3 sm:bottom-auto sm:left-auto sm:right-3 pointer-events-none bg-[#111111] border border-[#00c853] px-3 py-2 max-w-[295px]">
+              <div class="flex items-center justify-between gap-3 border-b border-[#333333] pb-1">
+                <span class="text-xs font-bold text-[#00e676] uppercase mono">CHAMBER B: TILTED FORWARD FLIGHT</span>
+                <span id="hudStatusB" class="text-[10px] mono px-1.5 py-0.5 bg-[#087f5b] text-[#ffffff] font-bold">REGIME F-II</span>
+              </div>
+              <p class="text-[11px] text-[#e5e5e0] mt-1.5 leading-snug mono">
+                Tilt alpha_d = <span id="hudTiltB" class="text-[#00e676] font-bold">10.0°</span> | <span id="hudViB" class="text-[#00e676] font-bold">U_a = 1.08 m/s</span>. Axial inflow reduces outboard AoA &amp; shifts FoM along J polar.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Row: Telemetry Table & Fig 6 BEMT FoM(J) / Azimuthal Thrust Plot -->
+      <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+        <!-- Module 04: Comparative Aerodynamic Telemetry Table (7 cols) -->
+        <div class="xl:col-span-7 panel-frame flex flex-col justify-between">
+          <div class="panel-header flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-[#111111] mono">
+              04 // 40-STRIP x 72-SECTOR BEMT &amp; RANS TELEMETRY
+            </h3>
+            <span id="activeBladeHeaderTag" class="text-xs text-[#087f5b] font-bold mono">SPECIMEN: C0001 / B00</span>
+          </div>
+
+          <div class="p-3 overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs border border-[#111111]">
+              <thead>
+                <tr class="bg-[#f3f2ee] border-b border-[#111111] text-[#111111] text-[11px] uppercase mono">
+                  <th class="py-1.5 px-2.5 font-bold border-r border-[#b8b7b0]">40-Strip BEMT / RANS Metric</th>
+                  <th class="py-1.5 px-2.5 font-bold text-[#d9480f] text-right border-r border-[#b8b7b0]">Case A (Chamber A)</th>
+                  <th class="py-1.5 px-2.5 font-bold text-[#087f5b] text-right border-r border-[#b8b7b0]">Case B (Chamber B)</th>
+                  <th class="py-1.5 px-2.5 font-bold text-[#111111] text-right">Hover Ref / Delta</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[#b8b7b0] mono text-[11px]">
+                <tr>
+                  <td class="py-1.5 px-2.5 font-sans font-medium text-[#111111] border-r border-[#b8b7b0]">Freestream V_inf &amp; Advance Ratio J</td>
+                  <td id="tblSpeedA" class="py-1.5 px-2.5 text-right font-semibold text-[#d9480f] border-r border-[#b8b7b0]">4.00 m/s (J=0.148)</td>
+                  <td id="tblSpeedB" class="py-1.5 px-2.5 text-right font-semibold text-[#087f5b] border-r border-[#b8b7b0]">6.21 m/s (J=0.230)</td>
+                  <td id="tblSpeedDelta" class="py-1.5 px-2.5 text-right text-[#333333]">nD = 27.00 m/s</td>
+                </tr>
+                <tr class="bg-[#fafaf7]">
+                  <td class="py-1.5 px-2.5 font-sans font-medium text-[#111111] border-r border-[#b8b7b0]">Edgewise Ratio mu = V_x / (Omega R)</td>
+                  <td id="tblMuA" class="py-1.5 px-2.5 text-right font-semibold text-[#d9480f] border-r border-[#b8b7b0]">0.0472</td>
+                  <td id="tblMuB" class="py-1.5 px-2.5 text-right font-semibold text-[#087f5b] border-r border-[#b8b7b0]">0.0721</td>
+                  <td id="tblMuDelta" class="py-1.5 px-2.5 text-right text-[#333333]">Omega R = 84.82 m/s</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-2.5 font-sans font-medium text-[#111111] border-r border-[#b8b7b0]">Axial Inflow Velocity U_a = V_inf sin(alpha_d)</td>
+                  <td id="tblAxialA" class="py-1.5 px-2.5 text-right font-semibold text-[#d9480f] border-r border-[#b8b7b0]">0.000 m/s</td>
+                  <td id="tblAxialB" class="py-1.5 px-2.5 text-right font-semibold text-[#087f5b] border-r border-[#b8b7b0]">1.078 m/s</td>
+                  <td id="tblAxialDelta" class="py-1.5 px-2.5 text-right text-[#0077b6] font-semibold">lam_c = U_a/(Omega R)</td>
+                </tr>
+                <tr class="bg-[#fafaf7]">
+                  <td class="py-1.5 px-2.5 font-sans font-medium text-[#111111] border-r border-[#b8b7b0]">Mean Axial Induction (tilde_a_a0, v_i)</td>
+                  <td id="tblViA" class="py-1.5 px-2.5 text-right font-semibold text-[#d9480f] border-r border-[#b8b7b0]">0.1188 (6.72 m/s)</td>
+                  <td id="tblViB" class="py-1.5 px-2.5 text-right font-semibold text-[#087f5b] border-r border-[#b8b7b0]">0.1091 (6.17 m/s)</td>
+                  <td id="tblViDelta" class="py-1.5 px-2.5 text-right text-[#087f5b] font-bold">Eq. (7) Quadratic Root</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-2.5 font-sans font-medium text-[#111111] border-r border-[#b8b7b0]">Pitt-Peters Skew Angle chi &amp; Gain k_x</td>
+                  <td id="tblSkewA" class="py-1.5 px-2.5 text-right font-semibold text-[#d9480f] border-r border-[#b8b7b0]">23.4° (k_x=0.31)</td>
+                  <td id="tblSkewB" class="py-1.5 px-2.5 text-right font-semibold text-[#087f5b] border-r border-[#b8b7b0]">30.2° (k_x=0.40)</td>
+                  <td id="tblSkewDelta" class="py-1.5 px-2.5 text-right text-[#333333]">k_x = (15pi/32)tan(chi/2)</td>
+                </tr>
+                <tr class="bg-[#fafaf7]">
+                  <td class="py-1.5 px-2.5 font-sans font-medium text-[#111111] border-r border-[#b8b7b0]">Azimuthal Thrust T(90°) / T(270°)</td>
+                  <td id="tblDissymA" class="py-1.5 px-2.5 text-right font-semibold text-[#d9480f] border-r border-[#b8b7b0]">1.225x (7.52/6.14N)</td>
+                  <td id="tblDissymB" class="py-1.5 px-2.5 text-right font-semibold text-[#087f5b] border-r border-[#b8b7b0]">1.348x (7.49/5.56N)</td>
+                  <td id="tblDissymDelta" class="py-1.5 px-2.5 text-right text-[#333333]">Advancing vs Retreating</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-2.5 font-sans font-bold text-[#111111] border-r border-[#b8b7b0]">Integrated Rotor Thrust T [N]</td>
+                  <td id="tblFxA" class="py-1.5 px-2.5 text-right font-bold text-[#d9480f] border-r border-[#b8b7b0]">6.8481 N</td>
+                  <td id="tblFxB" class="py-1.5 px-2.5 text-right font-bold text-[#087f5b] border-r border-[#b8b7b0]">6.5458 N</td>
+                  <td id="tblFxDelta" class="py-1.5 px-2.5 text-right text-[#111111] font-semibold">Hover T0 = 6.8280 N</td>
+                </tr>
+                <tr class="bg-[#f3f2ee] border-t border-[#111111]">
+                  <td class="py-1.5 px-2.5 font-sans font-bold text-[#111111] border-r border-[#b8b7b0]">Shaft Power P [W] &amp; Figure of Merit FoM</td>
+                  <td id="tblPowerA" class="py-1.5 px-2.5 text-right font-bold text-[#d9480f] border-r border-[#b8b7b0]">83.939 W (0.5130)</td>
+                  <td id="tblPowerB" class="py-1.5 px-2.5 text-right font-bold text-[#087f5b] border-r border-[#b8b7b0]">83.296 W (0.4831)</td>
+                  <td id="tblPowerDelta" class="py-1.5 px-2.5 text-right font-bold text-[#087f5b]">P0=86.17W (FoM0=0.4975)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Module 05: Coupled BEMT Azimuthal Thrust T(psi) & FoM(J) Curve (5 cols) -->
+        <div class="xl:col-span-5 panel-frame flex flex-col justify-between">
+          <div class="panel-header flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-[#111111] mono">
+              05 // FIG. 6 BEMT AZIMUTHAL T(psi) &amp; FoM(J)
+            </h3>
+            <span id="acousticDeltaBadge" class="text-xs mono font-bold text-[#0077b6]">dOASPL_F(J=0.23): 0.00 dB</span>
+          </div>
+
+          <div class="p-3 flex-1 flex flex-col justify-between gap-2.5">
+            <div class="relative w-full h-52 bg-[#080a0f] border border-[#111111]">
+              <canvas id="powerCurveCanvas" class="w-full h-full block"></canvas>
+            </div>
+
+            <div id="manuscriptNoteBox" class="text-[11px] text-[#111111] leading-relaxed bg-[#f3f2ee] p-2.5 border border-[#111111] mono">
+              <strong>EXACT 40-STRIP SOLVER (run_bemt_solver.py):</strong> Discretizes r in [30, 150] mm into N_r=40 strips (dr=3.0 mm) across N_psi=72 sectors with globally C1 Clark-Y + Viterna-Corrigan polars (a_lin=7.453°, a_stall=11.50°, cl_max=1.2400) and calibrated (dtheta_trim=-0.9846°, k_ind=1.5271). Reproduces C0001 Hover (T=6.8280N, P=86.1700W, FoM=0.49755), F-I (0.47m/s: 6.8034N, 86.1627W), F-II (6.21m/s: 6.5458N, 83.2955W), and F-III (15.50m/s: 6.3433N, 82.0816W).
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ============================================================================
+    // EXACT 40-STRIP COUPLED AXIAL-SWIRL BEMT SOLVER & ARCHIVED RANS DATASET
+    // Ported directly from run_bemt_solver.py, campaign_100_sim_vs_calc.csv,
+    // and screening_permutations_1296_normalized.csv
+    // ============================================================================
+    (function () {
+      // Exact Geometric & Physical Constants from run_bemt_solver.py
+      const R = 0.150;                              // Tip radius (150.0 mm)
+      const r_hub = 0.030;                          // Hub radius (30.0 mm)
+      const L = R - r_hub;                          // Active blade span (0.120 m)
+      const Nb = 2;                                 // 2 blades
+      const rho = 1.225;                            // Air density (kg/m^3)
+      const nu = 1.461e-5;                          // Kinematic viscosity (m^2/s)
+      const A_disk = Math.PI * R * R;               // 0.07068583 m^2
+      const denom_fom = Math.sqrt(2.0 * rho * A_disk); // 0.4161493
+
+      // Calibrated Baseline Constants (exact root solution from run_bemt_solver.py)
+      const PITCH_OFF_CAL_RAD = -0.017183920638816963; // -0.9845661 deg
+      const PITCH_OFF_CAL_DEG = -0.9845661280919614;
+      const K_IND_CAL = 1.5271336917170086;
+
+      // 40-strip midpoint discretization (N_r = 40, dr = 0.003 m)
+      const N_r = 40;
+      const dr = L / N_r;
+      const r_k = new Float64Array(N_r);
+      const rn_k = new Float64Array(N_r);
+      const sh_k = new Float64Array(N_r);
+      const c_base_k = new Float64Array(N_r);
+      const twist_deg_k = new Float64Array(N_r);
+      const theta_k = new Float64Array(N_r);
+
+      let sum_sh_dr = 0.0;
+      for (let k = 0; k < N_r; k++) {
+        r_k[k] = r_hub + (k + 0.5) * dr;
+        rn_k[k] = (r_k[k] - r_hub) / L;
+        sh_k[k] = Math.pow(Math.sin(Math.PI * (0.12 + 0.82 * rn_k[k])), 0.65) * (1.0 - 0.22 * rn_k[k] * rn_k[k]);
+        sum_sh_dr += sh_k[k] * dr;
+      }
+      let sum_c_all = 0.0;
+      let sum_c_out42 = 0.0;
+      let sum_c_u081 = 0.0;
+      let sum_c_c1081 = 0.0;
+      for (let k = 0; k < N_r; k++) {
+        c_base_k[k] = sh_k[k] * (2882.40e-6 / sum_sh_dr);
+        twist_deg_k[k] = 24.0 * (1.0 - 0.68 * Math.pow(rn_k[k], 0.85));
+        theta_k[k] = (twist_deg_k[k] * Math.PI) / 180.0;
+        sum_c_all += c_base_k[k];
+        if (rn_k[k] >= 0.42) sum_c_out42 += c_base_k[k];
+        if (rn_k[k] >= 0.09) sum_c_u081 += c_base_k[k];
+        if (rn_k[k] >= 0.50) sum_c_c1081 += c_base_k[k];
+      }
+      const disc_outboard_frac = sum_c_out42 / sum_c_all;
+      const frac_u081 = sum_c_u081 / sum_c_all;
+      const frac_c1081 = sum_c_c1081 / sum_c_all;
+
+      // Globally C1-Continuous Low-Re Clark-Y + Viterna-Corrigan Polar Constants
+      const eta_a = 0.892;
+      const cl_alpha = 2.0 * Math.PI * eta_a; // 5.604601 rad^-1
+      const a_zero_deg = -3.20;
+      const a_stall_deg = 11.50;
+      const cl_max = 1.2400;
+      const a_lin_deg = 2.0 * ((cl_max / cl_alpha) * (180.0 / Math.PI) + a_zero_deg) - a_stall_deg; // 7.4530 deg
+      const a_zero = (a_zero_deg * Math.PI) / 180.0;
+      const a_lin = (a_lin_deg * Math.PI) / 180.0;
+      const a_stall = (a_stall_deg * Math.PI) / 180.0;
+      const cl_lin_end = cl_alpha * (a_lin - a_zero); // 1.0421
+      const tau_vc = (3.0 * Math.PI) / 180.0;
+      const AR = L / (2882.40e-6 / L); // 4.9958
+      const cd_max = 1.11 + 0.018 * AR; // 1.1999
+      const A1 = cd_max / 2.0;
+      const B1 = cd_max;
+      const A2 = (cl_max - cd_max * Math.sin(a_stall) * Math.cos(a_stall)) * Math.sin(a_stall) / Math.pow(Math.cos(a_stall), 2);
+
+      function evalPolar(alpha_rad, Re_c) {
+        const re_fac = Math.pow(Math.max(Re_c, 1e4) / 1.10e5, -0.12);
+        let cl, cd;
+        if (alpha_rad <= a_lin) {
+          cl = cl_alpha * (alpha_rad - a_zero);
+          cd = (0.0168 + 0.0245 * Math.pow(cl - 0.42, 2)) * re_fac;
+        } else if (alpha_rad <= a_stall) {
+          const da = alpha_rad - a_lin;
+          const span_a = a_stall - a_lin;
+          cl = cl_lin_end + cl_alpha * da * (1.0 - da / (2.0 * span_a));
+          cd = (0.0168 + 0.0245 * Math.pow(cl - 0.42, 2)) * re_fac;
+        } else {
+          const da_post = alpha_rad - a_stall;
+          const eta_vc = 1.0 - Math.exp(-da_post / tau_vc);
+          const cl_vc = A1 * Math.sin(2.0 * alpha_rad) + A2 * Math.pow(Math.cos(alpha_rad), 2) / Math.sin(alpha_rad);
+          cl = cl_max + eta_vc * (cl_vc - cl_max);
+          const cd_st = (0.0168 + 0.0245 * Math.pow(cl_max - 0.42, 2)) * re_fac;
+          const B2 = (cd_st - cd_max * Math.pow(Math.sin(a_stall), 2)) / Math.cos(a_stall);
+          const cd_vc = B1 * Math.pow(Math.sin(alpha_rad), 2) + B2 * Math.cos(alpha_rad);
+          cd = cd_st + eta_vc * (cd_vc - cd_st);
+        }
+        return { cl, cd };
+      }
+
+      // Archived Blade Specimen Catalog (from campaign_100_sim_vs_calc.csv & screening_permutations_1296_normalized.csv)
+      const BLADE_DB = {
+        C0001: {
+          id: 'C0001 / B00',
+          family: 'SmoothBaseline',
+          area_mm2: 2882.40,
+          dArea_pct: 0.00,
+          dOASPL_H: 0.00,
+          dOASPL_F: 0.00,
+          decay_k: 0.0,
+          meta: 'RANS B00 (178,412 cells): T=6.8116N, P=86.2110W, FoM=0.49552 | BEMT C0001: T=6.8280N, P=86.1700W, FoM=0.49755',
+          buildChord: () => Float64Array.from(c_base_k)
+        },
+        U022: {
+          id: 'U022',
+          family: 'OpenFOAM_CFD_Champion (TE Serration)',
+          area_mm2: 2901.80,
+          dArea_pct: +0.673,
+          dOASPL_H: -2.15,
+          dOASPL_F: -1.21,
+          decay_k: 2.51,
+          meta: 'RANS U022 (178,461 cells, c=0.58, h=4.3mm, lam/h=3.00): T=6.8110N, P=85.701W, FoM=0.49840 (dFoM_RANS=+0.581% vs B00; BEMT AreaCtrl=-0.032%)',
+          buildChord: () => {
+            const scale = 1.0 + (19.40 / 2882.40) / disc_outboard_frac;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.42 ? c * scale : c));
+          }
+        },
+        U043: {
+          id: 'U043',
+          family: 'OpenFOAM_CFD_TopThrust (TE Serration)',
+          area_mm2: 2897.50,
+          dArea_pct: +0.524,
+          dOASPL_H: -1.92,
+          dOASPL_F: -1.08,
+          decay_k: 2.51,
+          meta: 'RANS U043 (178,355 cells, c=0.45, h=3.8mm, lam/h=2.87): T=6.8310N (+0.285%), P=86.134W (-0.089%), FoM=0.49809 (dFoM_RANS=+0.518%)',
+          buildChord: () => {
+            const scale = 1.0 + (15.10 / 2882.40) / disc_outboard_frac;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.42 ? c * scale : c));
+          }
+        },
+        U081: {
+          id: 'U081',
+          family: 'OpenFOAM_CFD_NonConserved (Cut-In TE)',
+          area_mm2: 2568.20,
+          dArea_pct: -10.90,
+          dOASPL_H: -0.65,
+          dOASPL_F: -0.28,
+          decay_k: 2.51,
+          meta: 'RANS U081 (165,140 cells, f_A=0 Cut-In, c=0.91, h=8.9mm): T=5.5315N (-18.79%), P=73.582W (-14.65%), FoM=0.42486 (dFoM_RANS=-14.260%)',
+          buildChord: () => {
+            const scale = 1.0 - (314.20 / 2882.40) / frac_u081;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.09 ? c * scale : c));
+          }
+        },
+        C0073: {
+          id: 'C0073',
+          family: 'WaveRidges',
+          area_mm2: 2882.40,
+          dArea_pct: 0.00,
+          dOASPL_H: -3.60,
+          dOASPL_F: -2.79,
+          decay_k: 1.12,
+          meta: '1296 Grid C0073 (WaveRidges): Surrogate T=6.7700N, P=83.9382W, FoM=0.50428 (+1.35%) | Hover dOASPL=-3.60 dB, Fwd(J=0.23)=-2.79 dB',
+          buildChord: () => Float64Array.from(c_base_k)
+        },
+        C0109: {
+          id: 'C0109',
+          family: 'WaveRidges',
+          area_mm2: 2882.40,
+          dArea_pct: 0.00,
+          dOASPL_H: -3.70,
+          dOASPL_F: -2.86,
+          decay_k: 1.12,
+          meta: '1296 Grid C0109 (WaveRidges Leader): T=6.7788N, P=84.1881W, FoM=0.50377 (+1.25%) | Hover dOASPL=-3.70 dB, Fwd(J=0.23)=-2.86 dB',
+          buildChord: () => Float64Array.from(c_base_k)
+        },
+        C0217: {
+          id: 'C0217',
+          family: 'TESerrations (Tier I Pure TE)',
+          area_mm2: 2894.40,
+          dArea_pct: +0.42,
+          dOASPL_H: -2.37,
+          dOASPL_F: -1.33,
+          decay_k: 2.51,
+          meta: 'Tier-I Pure TE C0217: M3 dFoM=-0.42%, M4 dFoM=-0.29%±0.53% (df=72) | Hover dOASPL=-2.37 dB, Fwd(J=0.23)=-1.33 dB, TD_OASPL=66.18 dB',
+          buildChord: () => {
+            const scale = 1.0 + (12.00 / 2882.40) / disc_outboard_frac;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.42 ? c * scale : c));
+          }
+        },
+        C0289: {
+          id: 'C0289',
+          family: 'WaveRidges+TESerrations',
+          area_mm2: 2894.40,
+          dArea_pct: +0.42,
+          dOASPL_H: -5.24,
+          dOASPL_F: -3.70,
+          decay_k: 1.51,
+          meta: 'Tier-II Hybrid C0289 (WR+TE): M3 dFoM=+0.80%, M4 dFoM=+0.92%±0.54% | Hover dOASPL=-5.24 dB, Fwd(J=0.23)=-3.70 dB, TD_OASPL=64.29 dB',
+          buildChord: () => {
+            const scale = 1.0 + (12.00 / 2882.40) / disc_outboard_frac;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.42 ? c * scale : c));
+          }
+        },
+        C0295: {
+          id: 'C0295',
+          family: 'WaveRidges+Finlets+TESerrations',
+          area_mm2: 2894.40,
+          dArea_pct: +0.42,
+          dOASPL_H: -5.96,
+          dOASPL_F: -4.35,
+          decay_k: 1.37,
+          meta: 'Tier-II Triple C0295 (WR+FN+TE): M3 dFoM=+0.50%, M4 dFoM=+0.62%±0.54% | Hover dOASPL=-5.96 dB, Fwd(J=0.23)=-4.35 dB, TD_OASPL=63.54 dB',
+          buildChord: () => {
+            const scale = 1.0 + (12.00 / 2882.40) / disc_outboard_frac;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.42 ? c * scale : c));
+          }
+        },
+        C0345: {
+          id: 'C0345',
+          family: 'WaveRidges+Finlets+Fringes+TESerrations',
+          area_mm2: 2917.10,
+          dArea_pct: +1.20,
+          dOASPL_H: -6.39,
+          dOASPL_F: -4.70,
+          decay_k: 1.34,
+          meta: 'Quad Acoustic Leader C0345 (WR+FN+FR+TE): M3 dFoM=-1.47%, M4 dFoM=-1.35%±0.54% | Hover dOASPL=-6.39 dB, Fwd(J=0.23)=-4.70 dB, TD_OASPL=62.43 dB',
+          buildChord: () => {
+            const scale = 1.0 + (34.70 / 2882.40) / disc_outboard_frac;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.42 ? c * scale : c));
+          }
+        },
+        C1081: {
+          id: 'C1081',
+          family: 'TESerrations (Cut-In f_A=0)',
+          area_mm2: 2693.40,
+          dArea_pct: -6.56,
+          dOASPL_H: -0.78,
+          dOASPL_F: -0.32,
+          decay_k: 2.51,
+          meta: 'Cut-In TE C1081 (f_A=0, c=0.50, h=6.0mm): M3 dFoM=-5.80%, M4 dFoM=-5.96%±1.27% (df=18) | BEMT Smooth CutCtrl: T=6.5356N, P=80.5186W',
+          buildChord: () => {
+            const scale = 1.0 - (189.00 / 2882.40) / frac_c1081;
+            return Float64Array.from(c_base_k, (c, k) => (rn_k[k] >= 0.50 ? c * scale : c));
+          }
+        }
+      };
+
+      // Simulation State
+      const state = {
+        bladeId: 'C0001',
+        windSpeed: 4.00,                // Case A freestream speed V_inf,A (m/s)
+        pitchA_deg: 0.0,                // Case A disk tilt alpha_d,A (deg)
+        pitchB_deg: 10.0,               // Case B disk tilt alpha_d,B (deg, 10.0 deg in Manuscript Table 1)
+        forwardSpeedB: 2.21,            // Additional speed for Case B -> V_inf,B = 4.00 + 2.21 = 6.21 m/s (Regime F-II J=0.230!)
+        rpm: 5400,                      // Calibrated 5400 RPM
+        bladePitch_deg: PITCH_OFF_CAL_DEG, // Calibrated -0.9846 deg
+        azimuth_deg: 90,                // Inspected azimuth sector psi (deg)
+        viewMode: 'split',
+        isRunning: true,
+        showStreamlines: true,
+        showVortices: true,
+        showPressure: true,
+        showVectors: true,
+        simTime: 0
+      };
+
+      // Cache for 40x72 BEMT solves so 60fps rendering is instantaneous
+      let cacheKeyA = '';
+      let cachedAeroA = null;
+      let cacheKeyB = '';
+      let cachedAeroB = null;
+      let cacheKeyCurve = '';
+      let cachedCurveData = null;
+
+      // Exact 40-Strip x 72-Azimuthal-Sector Coupled Axial-Swirl BEMT Solver
+      function solveBEMT40StripFull(c_vec, pitch_offset_rad, k_ind, V_inf, alpha_d_deg, rpm_val, inspected_psi_deg) {
+        const Omega_loc = (2.0 * Math.PI * rpm_val) / 60.0;
+        const nD = (rpm_val / 60.0) * (2.0 * R);
+        const J_adv = V_inf / Math.max(nD, 1e-4);
+        const alpha_d = (alpha_d_deg * Math.PI) / 180.0;
+        const Ua = V_inf * Math.sin(alpha_d);
+        const V_edgewise = V_inf * Math.cos(alpha_d);
+        const mu = V_edgewise / (Omega_loc * R);
+        const lam_c = Ua / (Omega_loc * R);
+
+        const N_psi = 72; // 5-degree sectors matching run_bemt_solver.py
+        const aa0_k = new Float64Array(N_r);
+        const at0_k = new Float64Array(N_r);
+
+        // Step 1: Damped Picard iteration (80 steps) for azimuth-mean induction (tilde_a_a0, a_t0) at each strip k
+        for (let k = 0; k < N_r; k++) {
+          const rk = r_k[k];
+          const ck = c_vec[k];
+          const thk = theta_k[k] + pitch_offset_rad;
+          const Ut0 = Omega_loc * rk;
+          const ua_ut = Ua / Ut0;
+          const sigma_k = (Nb * ck) / (2.0 * Math.PI * rk);
+          const Re_k = (Ut0 * ck) / nu;
+          let aa = 0.12;
+          let at = 0.01;
+
+          for (let iter = 0; iter < 80; iter++) {
+            const phi = Math.atan2(ua_ut + aa, Math.max(1.0 - at, 0.1));
+            const s_phi = Math.max(Math.abs(Math.sin(phi)), 1e-4);
+            const f_tip = (Nb / 2.0) * (R - rk) / (rk * s_phi);
+            const f_root = (Nb / 2.0) * (rk - r_hub) / (rk * s_phi);
+            const F_k = Math.max(
+              (2.0 / Math.PI) * Math.acos(Math.exp(-Math.min(f_tip, 40.0))) *
+              (2.0 / Math.PI) * Math.acos(Math.exp(-Math.min(f_root, 40.0))),
+              0.05
+            );
+            const alpha = thk - phi;
+            const pol = evalPolar(alpha, Re_k);
+            const Ca = Math.max(pol.cl * Math.cos(phi) - pol.cd * Math.sin(phi), 1e-5);
+            const Ct = Math.max(k_ind * pol.cl * Math.sin(phi) + pol.cd * Math.cos(phi), 1e-5);
+            const w_ut_sq = (ua_ut + aa) * (ua_ut + aa) + (1.0 - at) * (1.0 - at);
+            const R_rhs = (sigma_k * Ca / F_k) * w_ut_sq;
+            const aa_new = 0.5 * (-ua_ut + Math.sqrt(ua_ut * ua_ut + R_rhs));
+            const denom_at = Math.max(4.0 * F_k * Math.abs(ua_ut + aa_new), 1e-5);
+            const at_new = Math.min((sigma_k * Ct * w_ut_sq) / denom_at, 0.35);
+            if (Math.abs(aa_new - aa) < 1e-11 && Math.abs(at_new - at) < 1e-11) {
+              aa = aa_new;
+              at = at_new;
+              break;
+            }
+            aa = 0.45 * aa_new + 0.55 * aa;
+            at = 0.45 * at_new + 0.55 * at;
+          }
+          aa0_k[k] = aa;
+          at0_k[k] = at;
+        }
+
+        // Step 2: Pitt-Peters wake skew angle chi and longitudinal gain k_x (Eq. 8)
+        let lam_i0 = 0.0;
+        for (let k = 0; k < N_r; k++) {
+          lam_i0 += aa0_k[k] * (r_k[k] / R);
+        }
+        lam_i0 /= N_r;
+
+        let chi = 0.0;
+        let k_x = 0.0;
+        if (V_inf > 1e-6) {
+          chi = Math.atan2(Math.abs(mu), Math.max(lam_c + lam_i0, 1e-4));
+          k_x = ((15.0 * Math.PI) / 32.0) * Math.tan(0.5 * chi);
+        }
+        const chi_deg = (chi * 180.0) / Math.PI;
+        const v_i_mean = lam_i0 * Omega_loc * R;
+
+        // Step 3: Integrate across N_psi = 72 azimuthal sectors and N_r = 40 radial strips (Eq. 9)
+        const dT_dr_map = new Float64Array(N_r * N_psi);
+        const T_psi = new Float64Array(N_psi);
+        let dT_tot = 0.0;
+        let dQ_tot = 0.0;
+
+        // Strip k = 27 is r_k = 112.5 mm = 0.7500 R
+        const k_075 = 27;
+        const j_inspected = Math.round(((inspected_psi_deg % 360) + 360) % 360 / 5) % N_psi;
+        let strip075_inspected = null;
+
+        for (let j = 0; j < N_psi; j++) {
+          const psi = (j * 2.0 * Math.PI) / N_psi;
+          const sin_psi = Math.sin(psi);
+          const cos_psi = Math.cos(psi);
+          let T_sector = 0.0;
+
+          for (let k = 0; k < N_r; k++) {
+            const rk = r_k[k];
+            const ck = c_vec[k];
+            const thk = theta_k[k] + pitch_offset_rad;
+            const Ut = Omega_loc * rk + V_edgewise * sin_psi;
+            if (Ut <= 1.0) continue;
+
+            const aa_loc = aa0_k[k] * (1.0 + k_x * (rk / R) * cos_psi);
+            const at_loc = at0_k[k];
+            const Wa = Ua + aa_loc * Ut;
+            const Wt = Ut * (1.0 - at_loc);
+            const W = Math.sqrt(Wa * Wa + Wt * Wt);
+            const phi = Math.atan2(Wa, Wt);
+            const alpha = thk - phi;
+            const Re_k = (W * ck) / nu;
+            const pol = evalPolar(alpha, Re_k);
+            const Ca = pol.cl * Math.cos(phi) - pol.cd * Math.sin(phi);
+            const Ct = k_ind * pol.cl * Math.sin(phi) + pol.cd * Math.cos(phi);
+
+            const dT_dr = 0.5 * rho * W * W * Nb * ck * Ca;
+            const dQ_dr = 0.5 * rho * W * W * Nb * ck * Ct * rk;
+
+            dT_dr_map[k * N_psi + j] = dT_dr;
+            T_sector += dT_dr * dr;
+            dT_tot += (dT_dr * dr) / N_psi;
+            dQ_tot += (dQ_dr * dr) / N_psi;
+
+            if (k === k_075 && j === j_inspected) {
+              strip075_inspected = {
+                Wa,
+                Wt,
+                W,
+                Ut,
+                phi_deg: (phi * 180.0) / Math.PI,
+                aoa_deg: (alpha * 180.0) / Math.PI,
+                thk_deg: (thk * 180.0) / Math.PI,
+                cl: pol.cl,
+                cd: pol.cd,
+                dT_dr,
+                Re_k,
+                stalled: (alpha * 180.0) / Math.PI > a_stall_deg
+              };
+            }
+          }
+          T_psi[j] = T_sector;
+        }
+
+        const P_tot = Omega_loc * dQ_tot;
+        const FoM = Math.pow(Math.max(dT_tot, 0), 1.5) / (denom_fom * Math.max(P_tot, 1e-4));
+
+        // Advancing (psi = 90 deg -> j = 18) vs Retreating (psi = 270 deg -> j = 54)
+        const T_adv = T_psi[18];
+        const T_ret = T_psi[54];
+        const dissymmetryRatio = T_adv / Math.max(T_ret, 0.1);
+        const dT_dr_adv_075 = dT_dr_map[k_075 * N_psi + 18];
+        const dT_dr_ret_075 = dT_dr_map[k_075 * N_psi + 54];
+
+        // Equivalent rotor in-plane drag + parasite drag for force vector display
+        const D_inplane = 0.018 * rho * A_disk * V_inf * V_inf + 0.08 * Math.abs(V_edgewise);
+
+        return {
+          V_rel: V_inf,
+          J_adv,
+          pitch_deg: alpha_d_deg,
+          alphaDisk: alpha_d,
+          V_edgewise,
+          V_axial: Ua,
+          mu_x: mu,
+          lam_i0,
+          v_i: v_i_mean,
+          chi_rad: chi,
+          chi_deg,
+          k_x,
+          T_total: dT_tot,
+          P_total: P_tot,
+          FoM,
+          T_psi,
+          T_adv,
+          T_ret,
+          dT_dr_adv_075,
+          dT_dr_ret_075,
+          dissymmetryRatio,
+          dT_dr_map,
+          N_psi,
+          azCurrent: strip075_inspected,
+          D_inplane,
+          Re_075: strip075_inspected ? strip075_inspected.Re_k : 1.10e5
+        };
+      }
+
+      function getAeroStates() {
+        const bladeCfg = BLADE_DB[state.bladeId] || BLADE_DB.C0001;
+        const pitch_rad = (state.bladePitch_deg * Math.PI) / 180.0;
+        const V_inf_A = state.windSpeed;
+        const V_inf_B = state.windSpeed + state.forwardSpeedB;
+
+        const keyA = `${state.bladeId}_${V_inf_A.toFixed(3)}_${state.pitchA_deg.toFixed(2)}_${state.rpm}_${state.bladePitch_deg.toFixed(4)}_${state.azimuth_deg}`;
+        if (keyA !== cacheKeyA) {
+          cachedAeroA = solveBEMT40StripFull(
+            bladeCfg.buildChord(),
+            pitch_rad,
+            K_IND_CAL,
+            V_inf_A,
+            state.pitchA_deg,
+            state.rpm,
+            state.azimuth_deg
+          );
+          cacheKeyA = keyA;
+        }
+
+        const keyB = `${state.bladeId}_${V_inf_B.toFixed(3)}_${state.pitchB_deg.toFixed(2)}_${state.rpm}_${state.bladePitch_deg.toFixed(4)}_${state.azimuth_deg}`;
+        if (keyB !== cacheKeyB) {
+          cachedAeroB = solveBEMT40StripFull(
+            bladeCfg.buildChord(),
+            pitch_rad,
+            K_IND_CAL,
+            V_inf_B,
+            state.pitchB_deg,
+            state.rpm,
+            state.azimuth_deg
+          );
+          cacheKeyB = keyB;
+        }
+
+        // Precompute FoM(J) curve & Hover reference for Panel 05 when blade/RPM/pitch changes
+        const keyCurve = `${state.bladeId}_${state.pitchB_deg.toFixed(2)}_${state.rpm}_${state.bladePitch_deg.toFixed(4)}`;
+        if (keyCurve !== cacheKeyCurve) {
+          const c_vec = bladeCfg.buildChord();
+          const hoverRef = solveBEMT40StripFull(c_vec, pitch_rad, K_IND_CAL, 0.0, 0.0, state.rpm, 90);
+          const jPts = [];
+          const nD = (state.rpm / 60.0) * (2.0 * R);
+          for (let idx = 0; idx <= 12; idx++) {
+            const j_val = idx * 0.05;
+            const v_val = j_val * nD;
+            const tilt_use = j_val === 0 ? 0.0 : state.pitchB_deg;
+            const res = solveBEMT40StripFull(c_vec, pitch_rad, K_IND_CAL, v_val, tilt_use, state.rpm, 90);
+            jPts.push({ J: j_val, V: v_val, T: res.T_total, P: res.P_total, FoM: res.FoM });
+          }
+          cachedCurveData = { hoverRef, jPts };
+          cacheKeyCurve = keyCurve;
+        }
+
+        return { aeroA: cachedAeroA, aeroB: cachedAeroB, curveData: cachedCurveData, bladeCfg };
+      }
+
+      // DOM Elements
+      const bladeDesignSelect = document.getElementById('bladeDesignSelect');
+      const bladeAreaBadge = document.getElementById('bladeAreaBadge');
+      const bladeArchiveMeta = document.getElementById('bladeArchiveMeta');
+      const activeBladeHeaderTag = document.getElementById('activeBladeHeaderTag');
+      const acousticDeltaBadge = document.getElementById('acousticDeltaBadge');
+
+      const windSpeedSlider = document.getElementById('windSpeedSlider');
+      const pitchASlider = document.getElementById('pitchASlider');
+      const pitchBSlider = document.getElementById('pitchBSlider');
+      const forwardSpeedBSlider = document.getElementById('forwardSpeedBSlider');
+      const rpmSlider = document.getElementById('rpmSlider');
+      const bladePitchSlider = document.getElementById('bladePitchSlider');
+      const azimuthSlider = document.getElementById('azimuthSlider');
+
+      const windSpeedVal = document.getElementById('windSpeedVal');
+      const pitchAVal = document.getElementById('pitchAVal');
+      const pitchBVal = document.getElementById('pitchBVal');
+      const forwardSpeedBVal = document.getElementById('forwardSpeedBVal');
+      const rpmVal = document.getElementById('rpmVal');
+      const bladePitchVal = document.getElementById('bladePitchVal');
+      const azimuthBadge = document.getElementById('azimuthBadge');
+      const ReynoldsBadge = document.getElementById('ReynoldsBadge');
+
+      const toggleStreamlines = document.getElementById('toggleStreamlines');
+      const toggleVortices = document.getElementById('toggleVortices');
+      const togglePressure = document.getElementById('togglePressure');
+      const toggleVectors = document.getElementById('toggleVectors');
+
+      const windTunnelCanvas = document.getElementById('windTunnelCanvas');
+      const airfoilCanvas = document.getElementById('airfoilCanvas');
+      const powerCurveCanvas = document.getElementById('powerCurveCanvas');
+
+      const hudOverlayA = document.getElementById('hudOverlayA');
+      const hudOverlayB = document.getElementById('hudOverlayB');
+
+      // Particle Streamline System
+      const NUM_PARTICLES = 130;
+      const particlesA = [];
+      const particlesB = [];
+
+      function initParticles(arr) {
+        arr.length = 0;
+        for (let i = 0; i < NUM_PARTICLES; i++) {
+          arr.push({
+            x: Math.random(),
+            y: Math.random(),
+            speedMult: 0.85 + Math.random() * 0.3,
+            size: 1.5 + Math.random() * 1.2,
+            trail: []
+          });
+        }
+      }
+      initParticles(particlesA);
+      initParticles(particlesB);
+
+      function sampleTunnelFlow(nx, ny, aero) {
+        const cx = 0.40;
+        const cy = 0.40;
+        const dx = nx - cx;
+        const dy = ny - cy;
+
+        let u = Math.max(0.4, aero.V_rel);
+        let v = 0;
+
+        const pitchRad = (aero.pitch_deg * Math.PI) / 180.0;
+        const wx = Math.sin(pitchRad);
+        const wy = Math.cos(pitchRad);
+
+        const s = dx * wy - dy * wx;
+        const n = dx * wx + dy * wy;
+
+        const diskHalfWidth = 0.16;
+        const skewTan = Math.tan(aero.chi_rad);
+        if (n > -0.08 && n < 0.65) {
+          const wakeShiftS = Math.max(0, n) * skewTan * 0.48;
+          const distFromWakeCenter = Math.abs(s - wakeShiftS);
+          const wakeRadius = diskHalfWidth * (1 - 0.15 * Math.tanh(n * 4));
+
+          if (distFromWakeCenter < wakeRadius * 1.35) {
+            const radialProfile = Math.exp(-Math.pow(distFromWakeCenter / wakeRadius, 2.2));
+            const axialBuildUp = 0.5 * (1 + Math.tanh(n * 14));
+            // Include Pitt-Peters longitudinal velocity gradient (1 + k_x * s/diskHalfWidth)
+            const pittPetersMod = 1.0 + 0.35 * aero.k_x * ((s - wakeShiftS) / diskHalfWidth);
+            const v_induced_mag = aero.v_i * 1.35 * radialProfile * axialBuildUp * Math.max(0.4, pittPetersMod);
+
+            u += v_induced_mag * wx;
+            v += v_induced_mag * wy;
+          }
+        }
+
+        return { u, v };
+      }
+
+      // Main Wind Tunnel Canvas Renderer
+      function renderWindTunnel(aeroA, aeroB, dt) {
+        const ctx = windTunnelCanvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const rect = windTunnelCanvas.getBoundingClientRect();
+        const W = rect.width;
+        const H = rect.height;
+
+        if (windTunnelCanvas.width !== Math.round(W * dpr) || windTunnelCanvas.height !== Math.round(H * dpr)) {
+          windTunnelCanvas.width = Math.round(W * dpr);
+          windTunnelCanvas.height = Math.round(H * dpr);
+        }
+        ctx.save();
+        ctx.scale(dpr, dpr);
+
+        ctx.fillStyle = '#080a0f';
+        ctx.fillRect(0, 0, W, H);
+
+        if (state.viewMode === 'split') {
+          hudOverlayA.classList.remove('hidden');
+          hudOverlayB.classList.remove('hidden');
+          const isStacked = W < 680;
+          if (isStacked) {
+            const halfH = H / 2;
+            drawSingleTunnelPane(ctx, 0, 0, W, halfH - 1, aeroA, particlesA, dt, 'A');
+            drawSingleTunnelPane(ctx, 0, halfH + 1, W, halfH - 1, aeroB, particlesB, dt, 'B');
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, halfH);
+            ctx.lineTo(W, halfH);
+            ctx.stroke();
+          } else {
+            const halfW = W / 2;
+            drawSingleTunnelPane(ctx, 0, 0, halfW - 1, H, aeroA, particlesA, dt, 'A');
+            drawSingleTunnelPane(ctx, halfW + 1, 0, halfW - 1, H, aeroB, particlesB, dt, 'B');
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(halfW, 0);
+            ctx.lineTo(halfW, H);
+            ctx.stroke();
+          }
+        } else {
+          hudOverlayA.classList.add('hidden');
+          hudOverlayB.classList.add('hidden');
+          drawPolarDiskComparison(ctx, W, H, aeroA, aeroB);
+        }
+
+        ctx.restore();
+      }
+
+      function drawSingleTunnelPane(ctx, ox, oy, pw, ph, aero, particles, dt, labelId) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(ox, oy, pw, ph);
+        ctx.clip();
+        ctx.translate(ox, oy);
+
+        // Optical Reticle Grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        const gridStep = 40;
+        for (let gx = 0; gx < pw; gx += gridStep) {
+          ctx.beginPath();
+          ctx.moveTo(gx, 0);
+          ctx.lineTo(gx, ph);
+          ctx.stroke();
+        }
+        for (let gy = 0; gy < ph; gy += gridStep) {
+          ctx.beginPath();
+          ctx.moveTo(0, gy);
+          ctx.lineTo(pw, gy);
+          ctx.stroke();
+        }
+
+        // Left Intake Flow Straightener Vaning
+        ctx.fillStyle = 'rgba(0, 180, 216, 0.12)';
+        ctx.fillRect(0, 0, 12, ph);
+        for (let hy = 10; hy < ph; hy += 16) {
+          ctx.strokeStyle = '#00b4d8';
+          ctx.beginPath();
+          ctx.moveTo(2, hy);
+          ctx.lineTo(12, hy);
+          ctx.stroke();
+        }
+
+        const cx = pw * 0.40;
+        const cy = ph * 0.40;
+        const diskR = pw * 0.16;
+        const pitchRad = (aero.pitch_deg * Math.PI) / 180.0;
+
+        // 1. Downwash & Pressure Envelope
+        if (state.showPressure) {
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(aero.chi_rad * 0.65);
+          ctx.fillStyle = labelId === 'A' ? 'rgba(255, 123, 0, 0.14)' : 'rgba(0, 230, 118, 0.14)';
+          ctx.strokeStyle = labelId === 'A' ? 'rgba(255, 123, 0, 0.35)' : 'rgba(0, 230, 118, 0.35)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-diskR, 0);
+          ctx.lineTo(diskR, 0);
+          ctx.lineTo(diskR * 0.78, ph * 0.60);
+          ctx.lineTo(-diskR * 0.78, ph * 0.60);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 2. Smoke Streamlines
+        if (state.showStreamlines) {
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            const flow = sampleTunnelFlow(p.x, p.y, aero);
+            if (state.isRunning) {
+              const stepScale = 0.017 * p.speedMult * (dt / 0.016);
+              p.x += (flow.u / 14) * stepScale;
+              p.y += (flow.v / 14) * stepScale;
+              p.trail.push({ x: p.x * pw, y: p.y * ph, speed: Math.hypot(flow.u, flow.v) });
+              if (p.trail.length > 14) p.trail.shift();
+
+              if (p.x > 1.03 || p.y > 1.03 || p.y < -0.03) {
+                p.x = 0.01;
+                p.y = 0.06 + Math.random() * 0.88;
+                p.trail.length = 0;
+              }
+            }
+
+            if (p.trail.length > 2) {
+              ctx.beginPath();
+              ctx.moveTo(p.trail[0].x, p.trail[0].y);
+              for (let k = 1; k < p.trail.length; k++) {
+                ctx.lineTo(p.trail[k].x, p.trail[k].y);
+              }
+              const spd = p.trail[p.trail.length - 1].speed;
+              const isAccelerated = spd > aero.V_rel + 1.5;
+              ctx.strokeStyle = isAccelerated
+                ? (labelId === 'A' ? 'rgba(255, 145, 0, 0.85)' : 'rgba(0, 230, 118, 0.85)')
+                : 'rgba(0, 180, 216, 0.55)';
+              ctx.lineWidth = isAccelerated ? 1.8 : 1.2;
+              ctx.stroke();
+
+              const head = p.trail[p.trail.length - 1];
+              ctx.fillStyle = isAccelerated ? '#ffffff' : '#00b4d8';
+              ctx.fillRect(head.x - p.size / 2, head.y - p.size / 2, p.size, p.size);
+            }
+          }
+        }
+
+        // 3. Helical Tip Vortex Filaments
+        if (state.showVortices) {
+          ctx.save();
+          const wx = Math.sin(pitchRad);
+          const wy = Math.cos(pitchRad);
+          const skewTan = Math.tan(aero.chi_rad);
+
+          for (let strand = 0; strand < 2; strand++) {
+            ctx.beginPath();
+            const phaseOffset = strand * Math.PI + state.simTime * 16;
+            const steps = 68;
+            for (let s = 0; s <= steps; s++) {
+              const frac = s / steps;
+              const distDown = frac * ph * 0.56;
+              const thetaHelix = frac * Math.PI * 7.5 - phaseOffset;
+              const radiusScale = diskR * (1 - 0.14 * Math.min(1, frac * 2.5));
+
+              const centerShiftX = distDown * skewTan * 0.55;
+              const centerShiftY = distDown;
+
+              const vx = cx + centerShiftX + Math.cos(thetaHelix) * radiusScale * wy - Math.sin(thetaHelix) * 6 * wx;
+              const vy = cy + centerShiftY - Math.cos(thetaHelix) * radiusScale * wx + Math.sin(thetaHelix) * 8 * wy;
+
+              if (s === 0) ctx.moveTo(vx, vy);
+              else ctx.lineTo(vx, vy);
+            }
+            ctx.strokeStyle = strand === 0
+              ? 'rgba(255, 85, 0, 0.85)'
+              : 'rgba(255, 214, 0, 0.65)';
+            ctx.lineWidth = 1.75;
+            ctx.stroke();
+          }
+
+          // Wake Skew Centerline Reference
+          ctx.save();
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + Math.tan(aero.chi_rad) * 110 * 0.55, cy + 110);
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.restore();
+        }
+
+        // 4. Rotor Test Stand & Scimitar Blades (R = 150 mm, r_hub = 30 mm)
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-pitchRad);
+
+        // MRF Zone / Rotor Support Pylon
+        ctx.strokeStyle = '#888888';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(0, 8);
+        ctx.lineTo(0, 34);
+        ctx.moveTo(-24, 34);
+        ctx.lineTo(24, 34);
+        ctx.stroke();
+
+        // Center Motor Nacelle (r_hub = 0.20 R)
+        ctx.fillStyle = '#111111';
+        ctx.strokeStyle = labelId === 'A' ? '#ff7b00' : '#00e676';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(-diskR * 0.20, -2, diskR * 0.40, 14);
+        ctx.fill();
+        ctx.stroke();
+
+        // Rotor Tip-Path Plane
+        const spinPhase = Math.sin(state.simTime * 22);
+        ctx.strokeStyle = labelId === 'A' ? 'rgba(255, 123, 0, 0.75)' : 'rgba(0, 230, 118, 0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(0, -4, diskR, 5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const bladeExtent = diskR * Math.abs(spinPhase);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(-bladeExtent * 0.5, -4, Math.max(4, bladeExtent * 0.5), 3.0, -0.10, 0, Math.PI * 2);
+        ctx.ellipse(bladeExtent * 0.5, -4, Math.max(4, bladeExtent * 0.5), 3.0, 0.10, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // 5. Force Vectors (Scaled to single-rotor ~6.83 N thrust)
+        if (state.showVectors) {
+          const vecScale = 10.5; // pixels per Newton for 6.83 N single rotor
+
+          // Reference Hover Load (6.828 N downward reference)
+          drawArrow(ctx, cx, cy + 10, cx, cy + 10 + 6.828 * vecScale, '#e5e5e0', 'T_0 Ref (6.83 N)', 'bottom');
+
+          // BEMT Integrated Thrust Vector T
+          const T_px = aero.T_total * vecScale;
+          const tx = cx - Math.sin(pitchRad) * T_px;
+          const ty = cy - Math.cos(pitchRad) * T_px;
+          drawArrow(ctx, cx, cy, tx, ty, '#00e676', `T = ${aero.T_total.toFixed(3)} N`, 'top');
+
+          // In-plane Edgewise Force Vector
+          const dragPx = Math.max(20, aero.D_inplane * vecScale * 4.0);
+          drawArrow(ctx, cx, cy, cx + dragPx, cy, '#ff5500', `V_inf=${aero.V_rel.toFixed(2)}m/s`, 'right');
+
+          if (Math.abs(aero.pitch_deg) > 0.5) {
+            const fxPull = aero.T_total * Math.sin(pitchRad) * vecScale * 2.5;
+            drawArrow(ctx, cx, cy, cx - fxPull, cy, '#00b4d8', `T*sin(a_d)=${(aero.T_total * Math.sin(pitchRad)).toFixed(2)}N`, 'left');
+          }
+        }
+
+        // Bottom Instrumentation Status Bar inside Viewport
+        ctx.fillStyle = '#111111';
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = 1;
+        ctx.fillRect(10, ph - 34, pw - 20, 24);
+        ctx.strokeRect(10, ph - 34, pw - 20, 24);
+
+        ctx.font = '600 10.5px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#ffffff';
+        const summaryText = `J:${aero.J_adv.toFixed(3)} | T:${aero.T_total.toFixed(4)}N | P:${aero.P_total.toFixed(2)}W | FoM:${aero.FoM.toFixed(5)}`;
+        ctx.fillText(summaryText, 16, ph - 18);
+
+        ctx.restore();
+      }
+
+      function drawArrow(ctx, x1, y1, x2, y2, color, label, labelPos) {
+        const headLen = 8;
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 2.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+
+        if (label) {
+          ctx.font = '600 10px "IBM Plex Mono", monospace';
+          let lx = x2;
+          let ly = y2;
+          if (labelPos === 'top') { lx -= 38; ly -= 8; }
+          else if (labelPos === 'bottom') { lx -= 36; ly += 14; }
+          else if (labelPos === 'right') { lx += 6; ly += 4; }
+          else if (labelPos === 'left') { lx -= 105; ly -= 6; }
+
+          ctx.fillStyle = '#080a0f';
+          const tw = ctx.measureText(label).width;
+          ctx.fillRect(lx - 3, ly - 10, tw + 6, 14);
+          ctx.fillStyle = color;
+          ctx.fillText(label, lx, ly);
+        }
+        ctx.restore();
+      }
+
+      // Top-Down Rotor Disk Polar Thrust Loading dT/dr [N/m] Map (Exact Fig. 6a from Manuscript)
+      function drawPolarDiskComparison(ctx, W, H, aeroA, aeroB) {
+        const halfW = W / 2;
+        drawSinglePolarDisk(ctx, 0, 0, halfW, H, aeroA, `CHAMBER A // dT/dr [N/m] (J=${aeroA.J_adv.toFixed(3)})`, '#ff7b00');
+        drawSinglePolarDisk(ctx, halfW, 0, halfW, H, aeroB, `CHAMBER B // dT/dr [N/m] (J=${aeroB.J_adv.toFixed(3)})`, '#00e676');
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(halfW, 0);
+        ctx.lineTo(halfW, H);
+        ctx.stroke();
+      }
+
+      function drawSinglePolarDisk(ctx, ox, oy, pw, ph, aero, title, accentColor) {
+        ctx.save();
+        ctx.translate(ox, oy);
+
+        const cx = pw * 0.5;
+        const cy = ph * 0.53;
+        const maxR = Math.min(pw, ph) * 0.33;
+
+        ctx.font = '700 12px "IBM Plex Mono", monospace';
+        ctx.fillStyle = accentColor;
+        ctx.fillText(title, 18, 26);
+        ctx.font = '400 11px "IBM Plex Sans", sans-serif';
+        ctx.fillStyle = '#cccccc';
+        ctx.fillText(`40-Strip x 72-Sector Coupled BEMT dT/dr [N/m] | Mean T = ${aero.T_total.toFixed(4)} N`, 18, 44);
+
+        const N_psi = aero.N_psi;
+        for (let k = 0; k < N_r; k++) {
+          const rFrac1 = (r_hub + k * dr) / R;
+          const rFrac2 = (r_hub + (k + 1) * dr) / R;
+          for (let j = 0; j < N_psi; j++) {
+            const psiRad1 = (j / N_psi) * Math.PI * 2 - Math.PI / 2;
+            const psiRad2 = ((j + 1) / N_psi) * Math.PI * 2 - Math.PI / 2;
+            const dT_dr = aero.dT_dr_map[k * N_psi + j];
+            // Scale against 0..120 N/m matching Fig 6a colorbar in manuscript
+            const norm = Math.min(1.0, Math.max(0.0, dT_dr / 120.0));
+
+            // YlOrRd-inspired high-contrast thermal colormap matching Fig 6a
+            const rCol = Math.round(255 * Math.min(1, 0.35 + norm * 0.9));
+            const gCol = Math.round(240 * Math.pow(1.0 - norm * 0.85, 1.4));
+            const bCol = Math.round(80 * Math.pow(1.0 - norm, 2.2));
+
+            ctx.fillStyle = `rgb(${rCol}, ${gCol}, ${bCol})`;
+            ctx.beginPath();
+            ctx.arc(cx, cy, rFrac2 * maxR, psiRad1, psiRad2);
+            ctx.arc(cx, cy, rFrac1 * maxR, psiRad2, psiRad1, true);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+
+        // Hub Cutout Ring (r_hub / R = 0.20) & Radial Rings
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+        [0.20, 0.40, 0.60, 0.80, 1.00].forEach(f => {
+          ctx.beginPath();
+          ctx.arc(cx, cy, maxR * f, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        ctx.font = '600 10px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('psi=90° Advancing', cx - 52, cy - maxR - 10);
+        ctx.fillText('psi=270° Retreating', cx - 55, cy + maxR + 18);
+        ctx.fillStyle = '#ff9e00';
+        ctx.fillText(`T(90°)=${aero.T_adv.toFixed(3)}N`, cx + maxR * 0.48, cy - maxR * 0.78);
+        ctx.fillStyle = '#00b4d8';
+        ctx.fillText(`T(270°)=${aero.T_ret.toFixed(3)}N`, cx - maxR * 1.15, cy + maxR * 0.82);
+
+        const selRad = ((state.azimuth_deg * Math.PI) / 180.0) - Math.PI / 2;
+        ctx.strokeStyle = '#00e676';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(selRad) * maxR, cy + Math.sin(selRad) * maxR);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      // Airfoil Velocity Triangle Inspector at Strip k = 27 (r = 112.5 mm = 0.75R)
+      function renderAirfoilInspector(aeroA, aeroB) {
+        const ctx = airfoilCanvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const rect = airfoilCanvas.getBoundingClientRect();
+        const W = rect.width;
+        const H = rect.height;
+
+        if (airfoilCanvas.width !== Math.round(W * dpr) || airfoilCanvas.height !== Math.round(H * dpr)) {
+          airfoilCanvas.width = Math.round(W * dpr);
+          airfoilCanvas.height = Math.round(H * dpr);
+        }
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = '#080a0f';
+        ctx.fillRect(0, 0, W, H);
+
+        const cx = W * 0.56;
+        const cy = H * 0.58;
+        const bA = aeroA.azCurrent;
+        const bB = aeroB.azCurrent;
+        if (!bA || !bB) {
+          ctx.restore();
+          return;
+        }
+        const theta_075_rad = (bB.thk_deg * Math.PI) / 180.0;
+
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = '#555555';
+        ctx.beginPath();
+        ctx.moveTo(16, cy);
+        ctx.lineTo(W - 16, cy);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.font = '500 10px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#aaaaaa';
+        ctx.fillText(`0.75R DISK PLANE (theta_0.75R = ${bB.thk_deg.toFixed(2)}°)`, 14, cy - 6);
+
+        const vLenX = 115;
+        const vLenY_A = Math.min(62, (bA.Wa / Math.max(1, bA.Wt)) * vLenX * 3.2);
+        const vLenY_B = Math.min(62, (bB.Wa / Math.max(1, bB.Wt)) * vLenX * 3.2);
+
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        drawArrow(ctx, cx - vLenX, cy + vLenY_A, cx, cy, '#ff7b00', `W_A (phi=${bA.phi_deg.toFixed(2)}°)`, 'bottom');
+        ctx.restore();
+
+        drawArrow(ctx, cx - vLenX, cy + vLenY_B, cx, cy, '#00e676', `W_B (phi=${bB.phi_deg.toFixed(2)}°)`, 'top');
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-theta_075_rad);
+
+        ctx.strokeStyle = '#888888';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-65, 0);
+        ctx.lineTo(65, 0);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#00b4d8';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-48, 0);
+        ctx.bezierCurveTo(-48, -12, -10, -14, 48, 0);
+        ctx.bezierCurveTo(0, 3, -35, 5, -48, 0);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+
+        drawArrow(ctx, cx, cy, cx + 10, cy - 58, '#00b4d8', `c_l=${bB.cl.toFixed(3)}`, 'right');
+
+        ctx.restore();
+      }
+
+      // Panel 05: Coupled BEMT FoM(J) Curve & Azimuthal Thrust T(psi) (Manuscript Fig. 6b & 6c)
+      function renderPowerCurve(aeroA, aeroB, curveData) {
+        const ctx = powerCurveCanvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const rect = powerCurveCanvas.getBoundingClientRect();
+        const W = rect.width;
+        const H = rect.height;
+
+        if (powerCurveCanvas.width !== Math.round(W * dpr) || powerCurveCanvas.height !== Math.round(H * dpr)) {
+          powerCurveCanvas.width = Math.round(W * dpr);
+          powerCurveCanvas.height = Math.round(H * dpr);
+        }
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = '#080a0f';
+        ctx.fillRect(0, 0, W, H);
+
+        // Split Panel 05 into Left: Azimuthal T(psi) [Fig 6b] and Right: FoM(J) [Fig 6c]
+        const midX = W * 0.50;
+
+        // --- Sub-plot 1 (Left): Azimuthal Thrust T(psi) [N] over psi in [0, 360] ---
+        const p1L = 36, p1R = midX - 10, p1T = 22, p1B = H - 24;
+        const p1W = p1R - p1L;
+        const p1H = p1B - p1T;
+        const minT = 5.2, maxT = 7.8;
+
+        ctx.font = '700 9.5px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('FIG. 6b: AZIMUTHAL T(psi) [N]', p1L - 4, 14);
+
+        ctx.strokeStyle = '#222630';
+        ctx.lineWidth = 1;
+        [5.5, 6.2, 6.83, 7.5].forEach(tVal => {
+          const y = p1B - ((tVal - minT) / (maxT - minT)) * p1H;
+          ctx.beginPath();
+          ctx.moveTo(p1L, y);
+          ctx.lineTo(p1R, y);
+          ctx.stroke();
+          ctx.fillStyle = '#aaaaaa';
+          ctx.font = '400 8.5px "IBM Plex Mono", monospace';
+          ctx.fillText(tVal.toFixed(1), 4, y + 3);
+        });
+
+        [0, 90, 180, 270, 360].forEach(psiVal => {
+          const x = p1L + (psiVal / 360) * p1W;
+          ctx.beginPath();
+          ctx.moveTo(x, p1T);
+          ctx.lineTo(x, p1B);
+          ctx.stroke();
+          ctx.fillStyle = '#aaaaaa';
+          ctx.font = '400 8.5px "IBM Plex Mono", monospace';
+          ctx.fillText(`${psiVal}°`, x - 8, H - 8);
+        });
+
+        // Plot Case A T(psi) (Orange) and Case B T(psi) (Green)
+        function plotTpsi(aero, color) {
+          ctx.beginPath();
+          const N_psi = aero.N_psi;
+          for (let j = 0; j <= N_psi; j++) {
+            const idx = j % N_psi;
+            const psiDeg = (j / N_psi) * 360;
+            const x = p1L + (psiDeg / 360) * p1W;
+            const tClamped = Math.min(maxT, Math.max(minT, aero.T_psi[idx]));
+            const y = p1B - ((tClamped - minT) / (maxT - minT)) * p1H;
+            if (j === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+        }
+        plotTpsi(aeroA, '#ff7b00');
+        plotTpsi(aeroB, '#00e676');
+
+        // --- Sub-plot 2 (Right): Effective Figure of Merit FoM(J) vs J in [0, 0.60] [Fig 6c] ---
+        const p2L = midX + 34, p2R = W - 12, p2T = 22, p2B = H - 24;
+        const p2W = p2R - p2L;
+        const p2H = p2B - p2T;
+        const minF = 0.455, maxF = 0.520;
+
+        ctx.font = '700 9.5px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('FIG. 6c: BEMT FoM vs J', p2L - 4, 14);
+
+        [0.46, 0.48, 0.498, 0.515].forEach(fVal => {
+          const y = p2B - ((fVal - minF) / (maxF - minF)) * p2H;
+          ctx.beginPath();
+          ctx.moveTo(p2L, y);
+          ctx.lineTo(p2R, y);
+          ctx.stroke();
+          ctx.fillStyle = '#aaaaaa';
+          ctx.font = '400 8.5px "IBM Plex Mono", monospace';
+          ctx.fillText(fVal.toFixed(2), midX + 4, y + 3);
+        });
+
+        [0.0, 0.2, 0.4, 0.6].forEach(jVal => {
+          const x = p2L + (jVal / 0.60) * p2W;
+          ctx.beginPath();
+          ctx.moveTo(x, p2T);
+          ctx.lineTo(x, p2B);
+          ctx.stroke();
+          ctx.fillStyle = '#aaaaaa';
+          ctx.font = '400 8.5px "IBM Plex Mono", monospace';
+          ctx.fillText(jVal.toFixed(1), x - 8, H - 8);
+        });
+
+        // Plot FoM(J) curve
+        ctx.beginPath();
+        curveData.jPts.forEach((pt, idx) => {
+          const x = p2L + (pt.J / 0.60) * p2W;
+          const fClamped = Math.min(maxF, Math.max(minF, pt.FoM));
+          const y = p2B - ((fClamped - minF) / (maxF - minF)) * p2H;
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = '#00b4d8';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+
+        // Live Operating Markers on FoM(J)
+        const xa = p2L + (Math.min(0.60, aeroA.J_adv) / 0.60) * p2W;
+        const ya = p2B - ((Math.min(maxF, Math.max(minF, aeroA.FoM)) - minF) / (maxF - minF)) * p2H;
+        ctx.fillStyle = '#ff7b00';
+        ctx.fillRect(xa - 4, ya - 4, 8, 8);
+
+        const xb = p2L + (Math.min(0.60, aeroB.J_adv) / 0.60) * p2W;
+        const yb = p2B - ((Math.min(maxF, Math.max(minF, aeroB.FoM)) - minF) / (maxF - minF)) * p2H;
+        ctx.fillStyle = '#00e676';
+        ctx.fillRect(xb - 4, yb - 4, 8, 8);
+
+        ctx.restore();
+      }
+
+      // Update All Telemetry Readouts
+      function updateTelemetryUI(aeroA, aeroB, curveData, bladeCfg) {
+        const hoverRef = curveData.hoverRef;
+
+        bladeAreaBadge.textContent = `A_p = ${bladeCfg.area_mm2.toFixed(1)} mm² (${bladeCfg.dArea_pct >= 0 ? '+' : ''}${bladeCfg.dArea_pct.toFixed(2)}%)`;
+        bladeArchiveMeta.textContent = bladeCfg.meta;
+        activeBladeHeaderTag.textContent = `SPECIMEN: ${bladeCfg.id}`;
+
+        // Exploratory forward-flight dOASPL(J) decay from Fig. 6d: dOASPL_H * exp(-decay_k * J)
+        const dOASPL_B = bladeCfg.dOASPL_H === 0 ? 0.0 : bladeCfg.dOASPL_H * Math.exp(-bladeCfg.decay_k * aeroB.J_adv);
+        acousticDeltaBadge.textContent = `dOASPL(J=${aeroB.J_adv.toFixed(2)}): ${dOASPL_B.toFixed(2)} dB (Hover: ${bladeCfg.dOASPL_H.toFixed(2)} dB)`;
+
+        windSpeedVal.textContent = `${state.windSpeed.toFixed(2)} m/s (J = ${aeroA.J_adv.toFixed(3)})`;
+        pitchAVal.textContent = `${state.pitchA_deg.toFixed(1)}° ${Math.abs(state.pitchA_deg) < 0.3 ? '(Edgewise)' : ''}`;
+        pitchBVal.textContent = `${state.pitchB_deg.toFixed(1)}° (Tilted Forward)`;
+        const V_inf_B = state.windSpeed + state.forwardSpeedB;
+        forwardSpeedBVal.textContent = `${V_inf_B.toFixed(2)} m/s (J = ${aeroB.J_adv.toFixed(3)})`;
+        rpmVal.textContent = `${state.rpm}`;
+        bladePitchVal.textContent = `${state.bladePitch_deg >= 0 ? '+' : ''}${state.bladePitch_deg.toFixed(2)}°`;
+
+        let azLabel = 'Adv';
+        if (state.azimuth_deg > 180 && state.azimuth_deg < 360) azLabel = 'Ret';
+        else if (state.azimuth_deg === 0 || state.azimuth_deg === 180) azLabel = 'Long';
+        azimuthBadge.textContent = `psi = ${state.azimuth_deg}° (${azLabel})`;
+        ReynoldsBadge.textContent = `Re_0.75R = ${(aeroB.Re_075 / 1e5).toFixed(2)}e5`;
+
+        if (aeroA.azCurrent && aeroB.azCurrent) {
+          document.getElementById('foilPhiA').textContent = `${aeroA.azCurrent.phi_deg.toFixed(2)}°`;
+          document.getElementById('foilAoAA').textContent = `${aeroA.azCurrent.aoa_deg.toFixed(2)}°${aeroA.azCurrent.stalled ? ' [STALL]' : ''}`;
+          document.getElementById('foilUTA').textContent = `${aeroA.azCurrent.W.toFixed(2)} m/s`;
+          document.getElementById('foilLiftA').textContent = `${aeroA.azCurrent.dT_dr.toFixed(2)} N/m`;
+
+          document.getElementById('foilPhiB').textContent = `${aeroB.azCurrent.phi_deg.toFixed(2)}°`;
+          document.getElementById('foilAoAB').textContent = `${aeroB.azCurrent.aoa_deg.toFixed(2)}°${aeroB.azCurrent.stalled ? ' [STALL]' : ''}`;
+          document.getElementById('foilUTB').textContent = `${aeroB.azCurrent.W.toFixed(2)} m/s`;
+          document.getElementById('foilLiftB').textContent = `${aeroB.azCurrent.dT_dr.toFixed(2)} N/m`;
+        }
+
+        // HUD Overlays
+        document.getElementById('hudEdgeA').textContent = `${aeroA.V_edgewise.toFixed(2)} m/s`;
+        document.getElementById('hudSkewA').textContent = `${aeroA.chi_deg.toFixed(1)}°`;
+        const statusA = document.getElementById('hudStatusA');
+        statusA.textContent = aeroA.V_rel < 0.05 ? 'PURE HOVER (J=0)' : `J = ${aeroA.J_adv.toFixed(3)} EDGEWISE`;
+
+        document.getElementById('hudTiltB').textContent = `${state.pitchB_deg.toFixed(1)}°`;
+        document.getElementById('hudViB').textContent = `U_a = ${aeroB.V_axial.toFixed(2)} m/s`;
+        const statusB = document.getElementById('hudStatusB');
+        if (Math.abs(aeroB.J_adv - 0.0174) < 0.01) statusB.textContent = 'REGIME F-I (J=0.017)';
+        else if (Math.abs(aeroB.J_adv - 0.230) < 0.02) statusB.textContent = 'REGIME F-II (J=0.230)';
+        else if (Math.abs(aeroB.J_adv - 0.574) < 0.03) statusB.textContent = 'REGIME F-III (J=0.574)';
+        else statusB.textContent = `FORWARD J=${aeroB.J_adv.toFixed(3)}`;
+
+        // Table Cells
+        const nD = (state.rpm / 60.0) * (2.0 * R);
+        const omegaR = ((state.rpm * 2.0 * Math.PI) / 60.0) * R;
+        document.getElementById('tblSpeedA').textContent = `${aeroA.V_rel.toFixed(2)} m/s (J=${aeroA.J_adv.toFixed(3)})`;
+        document.getElementById('tblSpeedB').textContent = `${aeroB.V_rel.toFixed(2)} m/s (J=${aeroB.J_adv.toFixed(3)})`;
+        document.getElementById('tblSpeedDelta').textContent = `nD = ${nD.toFixed(2)} m/s`;
+
+        document.getElementById('tblMuA').textContent = aeroA.mu_x.toFixed(4);
+        document.getElementById('tblMuB').textContent = aeroB.mu_x.toFixed(4);
+        document.getElementById('tblMuDelta').textContent = `Omega*R = ${omegaR.toFixed(2)} m/s`;
+
+        document.getElementById('tblAxialA').textContent = `${aeroA.V_axial.toFixed(3)} m/s`;
+        document.getElementById('tblAxialB').textContent = `${aeroB.V_axial.toFixed(3)} m/s`;
+        document.getElementById('tblAxialDelta').textContent = `dU_a = +${(aeroB.V_axial - aeroA.V_axial).toFixed(3)} m/s`;
+
+        document.getElementById('tblViA').textContent = `${aeroA.lam_i0.toFixed(4)} (${aeroA.v_i.toFixed(2)} m/s)`;
+        document.getElementById('tblViB').textContent = `${aeroB.lam_i0.toFixed(4)} (${aeroB.v_i.toFixed(2)} m/s)`;
+        const viRedPct = ((aeroA.v_i - aeroB.v_i) / Math.max(0.1, aeroA.v_i)) * 100;
+        document.getElementById('tblViDelta').textContent = `${viRedPct >= 0 ? '-' : '+'}${Math.abs(viRedPct).toFixed(1)}% Axial Flush`;
+
+        document.getElementById('tblSkewA').textContent = `${aeroA.chi_deg.toFixed(1)}° (k_x=${aeroA.k_x.toFixed(2)})`;
+        document.getElementById('tblSkewB').textContent = `${aeroB.chi_deg.toFixed(1)}° (k_x=${aeroB.k_x.toFixed(2)})`;
+
+        document.getElementById('tblDissymA').textContent = `${aeroA.dissymmetryRatio.toFixed(3)}x (${aeroA.T_adv.toFixed(2)}/${aeroA.T_ret.toFixed(2)}N)`;
+        document.getElementById('tblDissymB').textContent = `${aeroB.dissymmetryRatio.toFixed(3)}x (${aeroB.T_adv.toFixed(2)}/${aeroB.T_ret.toFixed(2)}N)`;
+
+        document.getElementById('tblFxA').textContent = `${aeroA.T_total.toFixed(4)} N`;
+        document.getElementById('tblFxB').textContent = `${aeroB.T_total.toFixed(4)} N`;
+        document.getElementById('tblFxDelta').textContent = `Hover T0 = ${hoverRef.T_total.toFixed(4)} N`;
+
+        document.getElementById('tblPowerA').textContent = `${aeroA.P_total.toFixed(2)} W (FoM=${aeroA.FoM.toFixed(5)})`;
+        document.getElementById('tblPowerB').textContent = `${aeroB.P_total.toFixed(2)} W (FoM=${aeroB.FoM.toFixed(5)})`;
+        document.getElementById('tblPowerDelta').textContent = `P0=${hoverRef.P_total.toFixed(2)}W (FoM0=${hoverRef.FoM.toFixed(5)})`;
+      }
+
+      // Sync Sliders
+      function syncSlidersFromState() {
+        bladeDesignSelect.value = state.bladeId;
+        windSpeedSlider.value = state.windSpeed;
+        pitchASlider.value = state.pitchA_deg;
+        pitchBSlider.value = state.pitchB_deg;
+        forwardSpeedBSlider.value = state.forwardSpeedB;
+        rpmSlider.value = state.rpm;
+        bladePitchSlider.value = state.bladePitch_deg.toFixed(2);
+        azimuthSlider.value = state.azimuth_deg;
+      }
+
+      bladeDesignSelect.addEventListener('change', e => { state.bladeId = e.target.value; });
+      windSpeedSlider.addEventListener('input', e => { state.windSpeed = parseFloat(e.target.value); });
+      pitchASlider.addEventListener('input', e => { state.pitchA_deg = parseFloat(e.target.value); });
+      pitchBSlider.addEventListener('input', e => { state.pitchB_deg = parseFloat(e.target.value); });
+      forwardSpeedBSlider.addEventListener('input', e => { state.forwardSpeedB = parseFloat(e.target.value); });
+      rpmSlider.addEventListener('input', e => { state.rpm = parseFloat(e.target.value); });
+      bladePitchSlider.addEventListener('input', e => { state.bladePitch_deg = parseFloat(e.target.value); });
+      azimuthSlider.addEventListener('input', e => { state.azimuth_deg = parseFloat(e.target.value); });
+
+      toggleStreamlines.addEventListener('change', e => { state.showStreamlines = e.target.checked; });
+      toggleVortices.addEventListener('change', e => { state.showVortices = e.target.checked; });
+      togglePressure.addEventListener('change', e => { state.showPressure = e.target.checked; });
+      toggleVectors.addEventListener('change', e => { state.showVectors = e.target.checked; });
+
+      document.getElementById('azAdvBtn').addEventListener('click', () => {
+        state.azimuth_deg = 90;
+        syncSlidersFromState();
+      });
+      document.getElementById('azRetBtn').addEventListener('click', () => {
+        state.azimuth_deg = 270;
+        syncSlidersFromState();
+      });
+
+      const viewModeSplitBtn = document.getElementById('viewModeSplitBtn');
+      const viewModeDiskBtn = document.getElementById('viewModeDiskBtn');
+      viewModeSplitBtn.addEventListener('click', () => {
+        state.viewMode = 'split';
+        viewModeSplitBtn.className = 'mech-btn mech-btn-active';
+        viewModeDiskBtn.className = 'mech-btn';
+      });
+      viewModeDiskBtn.addEventListener('click', () => {
+        state.viewMode = 'disk';
+        viewModeDiskBtn.className = 'mech-btn mech-btn-active';
+        viewModeSplitBtn.className = 'mech-btn';
+      });
+
+      const presetBtns = [
+        document.getElementById('preset4msBtn'),
+        document.getElementById('presetF1Btn'),
+        document.getElementById('presetETLBtn'),
+        document.getElementById('presetHighWindBtn'),
+        document.getElementById('presetF3Btn')
+      ];
+      function highlightPreset(activeIdx) {
+        presetBtns.forEach((btn, idx) => {
+          btn.className = idx === activeIdx ? 'mech-btn mech-btn-active' : 'mech-btn';
+        });
+      }
+
+      // Preset 0: 4.0 m/s Crosswind Benchmark (Chamber A: 4.0 m/s Level Hover vs Chamber B: 4.0 m/s Tilted 10 deg)
+      document.getElementById('preset4msBtn').addEventListener('click', () => {
+        state.windSpeed = 4.00;
+        state.pitchA_deg = 0.0;
+        state.pitchB_deg = 10.0;
+        state.forwardSpeedB = 0.00;
+        state.rpm = 5400;
+        state.bladePitch_deg = PITCH_OFF_CAL_DEG;
+        syncSlidersFromState();
+        highlightPreset(0);
+      });
+
+      // Preset 1: Manuscript Regime F-I (J = 0.0174, V_inf = 0.47 m/s, alpha_d = 10 deg vs Pure Hover J = 0)
+      document.getElementById('presetF1Btn').addEventListener('click', () => {
+        state.windSpeed = 0.00;
+        state.pitchA_deg = 0.0;
+        state.pitchB_deg = 10.0;
+        state.forwardSpeedB = 0.47;
+        state.rpm = 5400;
+        state.bladePitch_deg = PITCH_OFF_CAL_DEG;
+        syncSlidersFromState();
+        highlightPreset(1);
+      });
+
+      // Preset 2: Manuscript Regime F-II Cruise (J = 0.230, V_inf = 6.21 m/s, alpha_d = 10 deg)
+      document.getElementById('presetETLBtn').addEventListener('click', () => {
+        state.windSpeed = 4.00;
+        state.pitchA_deg = 0.0;
+        state.pitchB_deg = 10.0;
+        state.forwardSpeedB = 2.21; // 4.00 + 2.21 = 6.21 m/s (exact J = 0.230!)
+        state.rpm = 5400;
+        state.bladePitch_deg = PITCH_OFF_CAL_DEG;
+        syncSlidersFromState();
+        highlightPreset(2);
+      });
+
+      // Preset 3: High Gale (10.0 m/s Crosswind vs Tilted Forward Flight)
+      document.getElementById('presetHighWindBtn').addEventListener('click', () => {
+        state.windSpeed = 10.00;
+        state.pitchA_deg = 0.0;
+        state.pitchB_deg = 10.0;
+        state.forwardSpeedB = 0.00;
+        state.rpm = 5400;
+        state.bladePitch_deg = PITCH_OFF_CAL_DEG;
+        state.azimuth_deg = 270;
+        syncSlidersFromState();
+        highlightPreset(3);
+      });
+
+      // Preset 4: Manuscript Regime F-III High-Speed Dash (J = 0.574, V_inf = 15.50 m/s, alpha_d = 10 deg)
+      document.getElementById('presetF3Btn').addEventListener('click', () => {
+        state.windSpeed = 4.00;
+        state.pitchA_deg = 0.0;
+        state.pitchB_deg = 10.0;
+        state.forwardSpeedB = 11.50; // 4.00 + 11.50 = 15.50 m/s (exact J = 0.574!)
+        state.rpm = 5400;
+        state.bladePitch_deg = PITCH_OFF_CAL_DEG;
+        syncSlidersFromState();
+        highlightPreset(4);
+      });
+
+      // Auto-Trim: restore exact calibrated manuscript trim (5400 RPM, dtheta = -0.9846 deg, alpha_d,B = 10.0 deg)
+      document.getElementById('autoTrimBtn').addEventListener('click', () => {
+        state.rpm = 5400;
+        state.bladePitch_deg = PITCH_OFF_CAL_DEG;
+        state.pitchA_deg = 0.0;
+        state.pitchB_deg = 10.0;
+        syncSlidersFromState();
+      });
+
+      document.getElementById('playPauseBtn').addEventListener('click', () => {
+        state.isRunning = !state.isRunning;
+        document.getElementById('playPauseText').textContent = state.isRunning ? 'Pause Flow' : 'Resume Flow';
+        document.getElementById('playPauseIcon').className = state.isRunning
+          ? 'w-2.5 h-2.5 inline-block bg-[#087f5b] border border-[#111111]'
+          : 'w-2.5 h-2.5 inline-block bg-[#d9480f] border border-[#111111]';
+      });
+
+      document.getElementById('resetSimBtn').addEventListener('click', () => {
+        state.bladeId = 'C0001';
+        document.getElementById('presetETLBtn').click();
+        initParticles(particlesA);
+        initParticles(particlesB);
+      });
+
+      let lastTime = performance.now();
+      let animFrameId = null;
+
+      function loop(now) {
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+        if (state.isRunning) {
+          state.simTime += dt;
+        }
+
+        const { aeroA, aeroB, curveData, bladeCfg } = getAeroStates();
+
+        updateTelemetryUI(aeroA, aeroB, curveData, bladeCfg);
+        renderWindTunnel(aeroA, aeroB, dt);
+        renderAirfoilInspector(aeroA, aeroB);
+        renderPowerCurve(aeroA, aeroB, curveData);
+
+        animFrameId = requestAnimationFrame(loop);
+      }
+
+      window.addEventListener('load', () => {
+        syncSlidersFromState();
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+        lastTime = performance.now();
+        animFrameId = requestAnimationFrame(loop);
+      });
+    })();
+  </script>
+</body>
+</html>
